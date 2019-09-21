@@ -42,8 +42,7 @@ object Playground extends IOApp {
     def create[F[_]: Concurrent, A](fa: F[A]): F[Cached[F, A]] = {
       sealed trait State
       case class Value(v: A) extends State
-      case class Updating(d: Deferred[F, Either[Throwable, A]])
-          extends State
+      case class Updating(d: Deferred[F, Either[Throwable, A]]) extends State
       case object NoValue extends State
 
       Ref.of[F, State](NoValue).map { state =>
@@ -59,7 +58,7 @@ object Playground extends IOApp {
                 case NoValue =>
                   Updating(newValue) -> fetch(newValue).rethrow
               }.flatten
-            }
+          }
 
           def fetch(d: Deferred[F, Either[Throwable, A]]) = {
             for {
@@ -72,16 +71,13 @@ object Playground extends IOApp {
               }
               _ <- d.complete(r)
             } yield r
-          }.guaranteeCase {
-            case ExitCase.Completed => ().pure[F]
-            case ExitCase.Error(_) => ().pure[F]
-            case ExitCase.Canceled =>
-              state.modify {
-                case st @ Value(v) => st -> d.complete(v.asRight).attempt.void
-                case NoValue | Updating(_) =>
-                  val appropriateError = new Exception("Couldn't retrieve")
-                  NoValue -> d.complete(appropriateError.asLeft).attempt.void
-              }.flatten
+          }.onCancel {
+            state.modify {
+              case st @ Value(v) => st -> d.complete(v.asRight).attempt.void
+              case NoValue | Updating(_) =>
+                val appropriateError = new Exception("Couldn't retrieve")
+                NoValue -> d.complete(appropriateError.asLeft).attempt.void
+            }.flatten
 
           }
 
