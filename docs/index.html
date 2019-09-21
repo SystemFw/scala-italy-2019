@@ -564,30 +564,32 @@ We might change it</p>
 ## Interruption in CE 3.0
 
 ```scala
-def fetch(d: Deferred[F, Either[Throwable, A]]) = uncancelable {
-  for {
-    r <- cancelable {
-        fa.attempt.onCancel {
-            state.set(NoValue) >> d.complete(error.asLeft))
-        }
-      }
-    _ <- state.set {
-      r match {
-        case Left(_) => NoValue
-        case Right(v) => Value(v)
-      }
+def fetch(d: Deferred[F, Either[Throwable, A]]) = {
+ def action = fa.attempt.onCancel {
+   state.set(NoValue) >> d.complete(error.asLeft)
+ } 
+ uncancelable {
+   for {
+     r <- cancelable(action)
+     _ <- state.set {
+       r match {
+         case Left(_) => NoValue
+         case Right(v) => Value(v)
+       }
     }
     _ <- d.complete(r)
   } yield r
+ }
 }
 ```
-
+</script></section></section><section  data-markdown><script type="text/template">
 # Ref + Deferred
 
 Your building blocks for composable concurrency
 <!-- .element: class="fragment" -->
 
-</script></section></section><section  data-markdown><script type="text/template"># Questions?
+</script></section><section  data-markdown><script type="text/template">
+# Questions?
 
 - I'm not on Twitter, reach out on Gitter @SystemFw!
 - Blog and talks at [https://systemfw.org](https://systemfw.org)
